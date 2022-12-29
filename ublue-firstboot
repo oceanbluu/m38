@@ -64,14 +64,34 @@ if [ "$?" != 0 ] ; then
 fi
 echo "30"
 
-echo "# Installing Thunderbird"
-/usr/bin/flatpak install --user --noninteractive flathub org.mozilla.Thunderbird
+echo "# Installing VLC"
+/usr/bin/flatpak install --user --noninteractive flathub org.videolan.VLC
 if [ "$?" != 0 ] ; then
         zenity --error \
-          --text="Installing Thunderbird Failed"
+          --text="Installing VLC Failed"
+        exit 1
+fi
+echo "35"
+
+echo "# Installing MS Edge"
+/usr/bin/flatpak install --user --noninteractive flathub com.microsoft.Edge
+if [ "$?" != 0 ] ; then
+        zenity --error \
+          --text="Installing MS Edge Failed"
         exit 1
 fi
 echo "40"
+
+echo "# Installing Discord"
+/usr/bin/flatpak install --user --noninteractive flathub com.discordapp.Discord
+if [ "$?" != 0 ] ; then
+        zenity --error \
+          --text="Installing Discord Failed"
+        exit 1
+fi
+echo "45"
+
+
 
 echo "# Installing Extension Manager"
 /usr/bin/flatpak install --user --noninteractive flathub com.mattjakeman.ExtensionManager
@@ -81,6 +101,15 @@ if [ "$?" != 0 ] ; then
         exit 1
 fi
 echo "50"
+
+echo "# Installing GIMP"
+/usr/bin/flatpak install --user --noninteractive flathub org.gimp.GIMP
+if [ "$?" != 0 ] ; then
+        zenity --error \
+          --text="Installing GIMP Failed"
+        exit 1
+fi
+echo "60"
 
 echo "# Installing LibreOffice"
 /usr/bin/flatpak install --user --noninteractive flathub org.libreoffice.LibreOffice
@@ -118,14 +147,26 @@ if [ "$?" != 0 ] ; then
 fi
 echo "90"
 
-echo "# Installing Celluloid Media Player"
-/usr/bin/flatpak install --user --noninteractive flathub io.github.celluloid_player.Celluloid
+#echo "# Installing Celluloid Media Player"
+#/usr/bin/flatpak install --user --noninteractive flathub io.github.celluloid_player.Celluloid
+#if [ "$?" != 0 ] ; then
+#        zenity --error \
+#          --text="Installing Celluloid Failed"
+#        exit 1
+#fi
+#echo "100"
+
+echo "# Installing Joplin"
+/usr/bin/flatpak install --user --noninteractive flathub net.cozic.joplin_desktop
 if [ "$?" != 0 ] ; then
         zenity --error \
-          --text="Installing Celluloid Failed"
+          --text="Installing Joplin Failed"
         exit 1
 fi
 echo "100"
+
+
+
 
 echo "# Reticulating Final Splines"
 mkdir -p "$HOME"/.config/ublue/
