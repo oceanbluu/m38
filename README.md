@@ -1,9 +1,23 @@
 # base
 
-[![build-ublue](https://github.com/ublue-os/base/actions/workflows/build.yml/badge.svg)](https://github.com/ublue-os/base/actions/workflows/build.yml)
+[![build-ublue](https://github.com/oceanbluu/base/actions/workflows/build.yml/badge.svg)](https://github.com/oceanbluu/base/actions/workflows/build.yml)
 
-A base image with a (mostly) stock Fedora Silverblue. Help us make a sweet base image: Pull requests and improvements appreciated and encouraged!   
+## Difference from original ublue-os
+Layerings:
+    - distrobox
+    + wireguard-tools
+    + ufw
+    + fail2ban
+Applications:
+    - Thunderbird
+    + MS Edge
+    + VLC
+    + Joplin
+    + Transmission
+    + Discord
+    + GIMP
 
+=====================================
 ## Usage
 
 Warning: This is an experimental feature and should not be used in production, try it in a VM for a while, you have been warned!
