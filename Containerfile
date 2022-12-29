@@ -12,6 +12,7 @@ RUN rpm-ostree override replace https://kojipkgs.fedoraproject.org//packages/rpm
 
 RUN rpm-ostree override remove firefox firefox-langpacks && \
     rpm-ostree install wireguard-tools fail2ban gnome-tweaks && \
+    rpm-ostree install ufw && \
     sed -i 's/#AutomaticUpdatePolicy.*/AutomaticUpdatePolicy=stage/' /etc/rpm-ostreed.conf && \
     systemctl enable rpm-ostreed-automatic.timer && \
     systemctl enable flatpak-automatic.timer && \
