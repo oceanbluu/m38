@@ -12,7 +12,20 @@ declare -a apps=(
 "org.gustavoperedo.FontDownloader"
 "com.github.tchx84.Flatseal"
 "net.cozic.joplin_desktop"
+"com.transmissionbt.Transmission"
 )
+
+declare -a pkgs=(
+"ufw"
+"virt-install"
+"libvirt-daemon-config-network"
+"libvirt-daemon-kvm"
+"qemu-kvm"
+"virt-manager"
+"virt-viewer"
+"virt-top"
+)
+
 
 if test -e "$HOME"/.config/ublue/firstboot-done; then
     echo "Already ran"
@@ -80,6 +93,14 @@ do
   fi
   echo $app ${apps[$app]} 
 done
+
+echo "# Installing $pkgs"
+/usr/bin/rpm-ostree install ${pkgs[@]}
+if [ "$?" != 0 ] ; then
+        zenity --error \
+          --text="Installing $pkgs Failed"
+        exit 1
+fi
 
 echo "# Reticulating Final Splines"
 mkdir -p "$HOME"/.config/ublue/
