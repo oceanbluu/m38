@@ -12,8 +12,8 @@ RUN rpm-ostree override remove firefox firefox-langpacks && \
 
 #   UFW qemu-kvm fails to build because it leaves some files in /var
 
-    rpm-ostree install libvirt && \
-    rpm-ostree install virt-install bridge-utils && \
+    rpm-ostree install virt-install && \
+    rpm-ostree install libvirt-daemon-config-network libvirt-daemon-kvm && \
 #    rpm-ostree install virt-manager && \
 #    rpm-ostree install virt-top guestfs-tools && \
 
