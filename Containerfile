@@ -10,10 +10,10 @@ COPY ublue-firstboot /usr/bin
 RUN rpm-ostree override remove firefox firefox-langpacks && \
     rpm-ostree install wireguard-tools fail2ban gnome-tweaks && \
 
-#   UFW fails to build because it leaves some files in /var
+#   UFW qemu-kvm fails to build because it leaves some files in /var
 
-    rpm-ostree install qemu-kvm && \ # libvirt && \
-#    rpm-ostree install virt-install bridge-utils && \
+    rpm-ostree install libvirt && \
+    rpm-ostree install virt-install bridge-utils && \
 #    rpm-ostree install virt-manager && \
 #    rpm-ostree install virt-top guestfs-tools && \
 
