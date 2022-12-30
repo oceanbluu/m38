@@ -14,5 +14,3 @@ RUN rpm-ostree override remove firefox firefox-langpacks && \
     systemctl enable rpm-ostreed-automatic.timer && \
     systemctl enable flatpak-automatic.timer && \
     ostree container commit
-
-CMD rpm-ostree install ufw
