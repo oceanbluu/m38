@@ -86,11 +86,11 @@ echo "25"
 
 for app in "${!apps[@]}"
 do
-  echo "# Installing $app"
-  /usr/bin/flatpak install --user --noninteractive flathub $app
+  echo "# Installing ${apps[$app]}"
+  /usr/bin/flatpak install --user --noninteractive flathub ${apps[$app]}
   if [ "$?" != 0 ] ; then
           zenity --error \
-            --text="Installing $app Failed"
+            --text="Installing ${apps[$app]} Failed"
           exit 1
   fi
   echo $app ${apps[$app]} 
