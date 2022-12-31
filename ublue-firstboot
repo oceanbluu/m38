@@ -13,8 +13,10 @@ declare -a apps=(
 "com.github.tchx84.Flatseal"
 "net.cozic.joplin_desktop"
 "com.transmissionbt.Transmission"
+"org.gnome.Builder"
 )
 
+# Workaround for some packages I havent figured how to build with buildah yet (using Containerfile)
 declare -a pkgs=(
 "ufw"
 "virt-install"
