@@ -35,9 +35,14 @@ if test -e "$HOME"/.config/ublue/firstboot-done; then
 fi
 
 (
+echo "# Tweaking UI/UX"
+/usr/bin/gsettings set org.gnome.desktop.peripherals.touchpad tap-to-click true
+/usr/bin/gsettings set org.gnome.desktop.interface monospace-font-name 'Noto Sans Mono 11'
+echo "00"
+
 echo "# Waiting for Internet connection"
 until /usr/bin/ping -q -c 1 flathub.org; do sleep 1; done
-echo "00"
+echo "01"
 
 echo "# Removing Filtered Flathub Repository"
 /usr/bin/flatpak remote-delete flathub --force ||:
