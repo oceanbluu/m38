@@ -10,9 +10,9 @@ COPY ublue-firstboot /usr/bin
 RUN rpm-ostree override remove firefox firefox-langpacks && \
 
 # remove a lot of fonts - must be a better way to get a cleaned up image without a lot of fonts in it
-rpm-ostree override remove gdouros-symbola-fonts-10.24-11.fc37.noarch julietaula-montserrat-fonts-7.222-3.fc37.noarch thai-scalable-fonts-common-0.7.3-3.fc37.noarch && \
+rpm-ostree override remove gdouros-symbola-fonts-10.24-11.fc37.noarch julietaula-montserrat-fonts-7.222-3.fc37.noarch google-noto-naskh-arabic-vf-fonts-20201206^1.git0c78c8329-7.fc37.noarch && \
 rpm-ostree override remove google-noto-cjk-fonts-common-20201206-5.fc37.noarch google-noto-sans-cjk-ttc-fonts-20201206-5.fc37.noarch && \
-rpm-ostree override remove thai-scalable-waree-fonts-0.7.3-3.fc37.noarch google-noto-naskh-arabic-vf-fonts-20201206^1.git0c78c8329-7.fc37.noarch && \
+rpm-ostree override remove thai-scalable-waree-fonts-0.7.3-3.fc37.noarch thai-scalable-fonts-common-0.7.3-3.fc37.noarch && \
 rpm-ostree override remove google-noto-sans-arabic-vf-fonts-20201206^1.git0c78c8329-7.fc37.noarch google-noto-sans-armenian-vf-fonts-20201206^1.git0c78c8329-7.fc37.noarch && \
 rpm-ostree override remove google-noto-sans-canadian-aboriginal-vf-fonts-20201206^1.git0c78c8329-7.fc37.noarch && \ 
 rpm-ostree override remove google-noto-sans-cherokee-vf-fonts-20201206^1.git0c78c8329-7.fc37.noarch && \
