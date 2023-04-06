@@ -2,7 +2,7 @@
 
 [![build-ublue](https://github.com/oceanbluu/base/actions/workflows/build.yml/badge.svg)](https://github.com/oceanbluu/base/actions/workflows/build.yml)
 
-## Difference from original ublue-os
+## Difference from original ublue-os (note: old original is now outdated - please visit original page for updates)
 Layerings:
     - distrobox
     + wireguard-tools
