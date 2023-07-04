@@ -14,7 +14,7 @@ COPY etc /etc
 
 COPY ublue-firstboot /usr/bin
 
-RUN rpm-ostree override remove firefox firefox-langpacks &&  \
+RUN rpm-ostree override remove firefox firefox-langpacks && \
     rpm-ostree install wireguard-tools fail2ban gnome-tweaks rclone && \
     sed -i 's/#AutomaticUpdatePolicy.*/AutomaticUpdatePolicy=stage/' /etc/rpm-ostreed.conf && \
     systemctl enable rpm-ostreed-automatic.timer && \
