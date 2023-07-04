@@ -10,7 +10,6 @@ ARG FEDORA_MAJOR_VERSION="${FEDORA_MAJOR_VERSION:-37}"
 
 FROM ${BASE_IMAGE}:${FEDORA_MAJOR_VERSION} 
 
-# ..
 COPY etc /etc
 
 COPY ublue-firstboot /usr/bin
