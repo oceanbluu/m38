@@ -1,6 +1,6 @@
 # base
 
-[![build-ublue](https://github.com/oceanbluu/base/actions/workflows/build.yml/badge.svg)](https://github.com/oceanbluu/base/actions/workflows/build.yml)
+[![build-my38](https://github.com/oceanbluu/m38/actions/workflows/build.yml/badge.svg)](https://github.com/oceanbluu/m38/actions/workflows/build.yml)
 
 ## Difference from original ublue-os (note: old original is now outdated - please visit original page for updates)
 Layerings:
