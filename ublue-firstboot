@@ -23,6 +23,7 @@ declare -a pkgs=(
 "libvirt-daemon-config-network"
 "libvirt-daemon-kvm"
 "qemu-kvm"
+"qemu-user-binfmt"
 "virt-manager"
 "virt-viewer"
 "virt-top"
