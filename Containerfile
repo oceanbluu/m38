@@ -1,4 +1,4 @@
-#ARG FEDORA_MAJOR_VERSION=38
+#ARG FEDORA_MAJOR_VERSION=41
 
 #FROM ghcr.io/cgwalters/fedora-silverblue:${FEDORA_MAJOR_VERSION}
 #FROM quay.io/fedora-ostree-desktops/fedora-silverblue:${FEDORA_MAJOR_VERSION}
@@ -6,7 +6,7 @@
 
 ARG IMAGE_NAME="${IMAGE_NAME:-silverblue}"
 ARG BASE_IMAGE="quay.io/fedora-ostree-desktops/${IMAGE_NAME}"
-ARG FEDORA_MAJOR_VERSION="${FEDORA_MAJOR_VERSION:-40}"
+ARG FEDORA_MAJOR_VERSION="${FEDORA_MAJOR_VERSION:-41}"
 
 FROM ${BASE_IMAGE}:${FEDORA_MAJOR_VERSION} 
 
@@ -15,7 +15,7 @@ COPY etc /etc
 COPY ublue-firstboot /usr/bin
 
 RUN rpm-ostree override remove firefox firefox-langpacks &&  \
-    rpm-ostree install wireguard-tools fail2ban gnome-tweaks rclone smartmontools iotop && \
+    rpm-ostree install wireguard-tools fail2ban gnome-tweaks rclone smartmontools iotop distrobox && \
     sed -i 's/#AutomaticUpdatePolicy.*/AutomaticUpdatePolicy=stage/' /etc/rpm-ostreed.conf && \
     systemctl enable rpm-ostreed-automatic.timer && \
     systemctl enable flatpak-automatic.timer && \
