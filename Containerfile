@@ -1,4 +1,4 @@
-#ARG FEDORA_MAJOR_VERSION=41
+#ARG FEDORA_MAJOR_VERSION=42
 
 #FROM ghcr.io/cgwalters/fedora-silverblue:${FEDORA_MAJOR_VERSION}
 #FROM quay.io/fedora-ostree-desktops/fedora-silverblue:${FEDORA_MAJOR_VERSION}
@@ -6,7 +6,7 @@
 
 ARG IMAGE_NAME="${IMAGE_NAME:-silverblue}"
 ARG BASE_IMAGE="quay.io/fedora-ostree-desktops/${IMAGE_NAME}"
-ARG FEDORA_MAJOR_VERSION="${FEDORA_MAJOR_VERSION:-41}"
+ARG FEDORA_MAJOR_VERSION="${FEDORA_MAJOR_VERSION:-42}"
 
 FROM ${BASE_IMAGE}:${FEDORA_MAJOR_VERSION} 
 
