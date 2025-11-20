@@ -115,10 +115,15 @@ jobs:
       - name: Sign OCI image
         if: github.event_name != 'pull_request'
         run: |
-          # Sign by tag instead of digest – works no matter what you rename the image to
-          for tag in ${{ steps.generate-tags.outputs.alias_tags }} ${{ steps.generate-tags.outputs.date }} ${{ steps.generate-tags.outputs.sha_short }}; do
-            cosign sign --yes --key cosign.key ${{ steps.registry_case.outputs.lowercase }}/${{ env.IMAGE_NAME }}:${tag}
-          done
+          # Wait for all tags to be fully registered in GHCR (important after rename)
+          sleep 10
+
+          # Sign by digest – this always works, no matter what the name or tags are
+          IMAGE_REF="${{ steps.registry_case.outputs.lowercase }}/${{ env.IMAGE_NAME }}"
+          DIGEST="${{ steps.push_oci.outputs.digest }}"
+
+          echo "Signing $IMAGE_REF@$DIGEST"
+          cosign sign --yes --key cosign.key "$IMAGE_REF@$DIGEST"
         env:
           COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
 
