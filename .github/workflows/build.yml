@@ -112,15 +112,15 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Sign container image
+      - name: Sign OCI image
         if: github.event_name != 'pull_request'
         run: |
-          cosign sign --yes --key cosign.key ${{ steps.registry_case.outputs.lowercase }}/${{ env.IMAGE_NAME }}@${TAGS}
+          # Sign by tag instead of digest – works no matter what you rename the image to
+          for tag in ${{ steps.generate-tags.outputs.alias_tags }} ${{ steps.generate-tags.outputs.date }} ${{ steps.generate-tags.outputs.sha_short }}; do
+            cosign sign --yes --key cosign.key ${{ steps.registry_case.outputs.lowercase }}/${{ env.IMAGE_NAME }}:${tag}
+          done
         env:
-          TAGS: ${{ steps.push.outputs.digest }}
-          COSIGN_EXPERIMENTAL: false
           COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
-
 
       - name: Echo outputs
         run: |
