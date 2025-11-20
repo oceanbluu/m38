@@ -118,7 +118,7 @@ jobs:
           IMAGE="${{ steps.registry_case.outputs.lowercase }}/${{ env.IMAGE_NAME }}"
 
           # Sign the two tags that always exist and matter
-          cosign sign --yes --key cosign.key "${IMAGE}:latest"
+          # cosign sign --yes --key cosign.key "${IMAGE}:latest"
           cosign sign --yes --key cosign.key "${IMAGE}:${{ matrix.major_version }}"
 
           # Optional: also sign the dated and sha tags if you want
