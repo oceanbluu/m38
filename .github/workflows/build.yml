@@ -12,7 +12,7 @@ on:
       - main
 
 env:
-  IMAGE_NAME: customSilverblue
+  IMAGE_NAME: customFAtomic
   IMAGE_REGISTRY: ghcr.io/${{ github.repository_owner }}
 
 jobs:
@@ -53,7 +53,7 @@ jobs:
           fi
           echo "alias_tags=${alias_tags[*]}" >> $GITHUB_OUTPUT
 
-      # 1. Build the fast OCI image
+      # 1. Build fast OCI image
       - name: Build OCI base image
         id: build_oci
         uses: redhat-actions/buildah-build@v2
@@ -69,7 +69,7 @@ jobs:
             FEDORA_MAJOR_VERSION=${{ matrix.major_version }}
           oci: true
 
-      # 2. Push OCI image first
+      # 2. Push OCI image
       - name: Lowercase Registry (GHCR workaround)
         id: registry_case
         uses: ASzc/change-string-case-action@v6
@@ -87,20 +87,22 @@ jobs:
           password: ${{ github.token }}
           extra-args: --disable-content-trust
 
-      # 3. Create config.toml for 200M composefs root
+      # 3. Create config.toml → minimum 200 MiB composefs root
       - name: Create bootc-image-builder config
         run: |
           cat > config.toml <<'EOF'
           [[customizations.disk.partitions]]
           mountpoint = "/"
-          size = "200 MiB"   # Minimum root size – final will be max(this, 2× base container size)
+          size = "200 MiB"
           EOF
 
-      # 4. Build disk image with large root using config.toml
-      - name: Build bootc disk image (200M composefs root)
+      # 4. Build disk image with large composefs root
+      - name: Build bootc disk image (≥200 MiB composefs root)
         run: |
           set -exo pipefail
           mkdir -p output
+
+          PRIMARY_TAG="${{ steps.generate-tags.outputs.alias_tags }}"
 
           podman run --rm --privileged --security-opt label=type:unconfined \
             -v $(pwd)/output:/output \
@@ -110,16 +112,14 @@ jobs:
               --config /config.toml \
               --tls-verify=false \
               --output /output \
-              ${{ steps.registry_case.outputs.lowercase }}/${{ env.IMAGE_NAME }}:${{ steps.generate-tags.outputs.alias_tags }} \
-              ${{ steps.registry_case.outputs.lowercase }}/${{ env.IMAGE_NAME }}:${{ steps.generate-tags.outputs.date }} \
-              ${{ steps.registry_case.outputs.lowercase }}/${{ env.IMAGE_NAME }}:${{ steps.generate-tags.outputs.sha_short }}
+              ${{ steps.registry_case.outputs.lowercase }}/${{ env.IMAGE_NAME }}:$PRIMARY_TAG
 
-          # Push all generated .qcow2 files
           for tag in ${{ steps.generate-tags.outputs.alias_tags }} ${{ steps.generate-tags.outputs.date }} ${{ steps.generate-tags.outputs.sha_short }}; do
-            podman push ${{ steps.registry_case.outputs.lowercase }}/${{ env.IMAGE_NAME }}:${tag}.qcow2
+            podman push ${{ steps.registry_case.outputs.lowercase }}/${{ env.IMAGE_NAME }}:${PRIMARY_TAG}.qcow2 \
+              ${{ steps.registry_case.outputs.lowercase }}/${{ env.IMAGE_NAME }}:${tag}.qcow2
           done
 
-      # 5. Cosign signing (unchanged)
+      # 5. Cosign signing (optional)
       - name: Install cosign
         if: github.event_name != 'pull_request'
         uses: sigstore/cosign-installer@v3.1.1
@@ -147,5 +147,4 @@ jobs:
 
       - name: Echo outputs
         run: |
-          echo "OCI image: ${{ steps.push_oci.outputs.imagewithdigest }}"
-          echo "Disk images pushed as .qcow2 with the same tags"
+          echo "All done – OCI + .qcow2 disk images with ≥200 MiB root are ready"
