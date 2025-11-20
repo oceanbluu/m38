@@ -53,7 +53,7 @@ jobs:
 
       # NEW: Use bootc-image-build instead of buildah-build
       - name: Build bootc disk image with 200M composefs root
-        uses: osbuild/bootc-image-builder-action@v0.1.0
+        uses: osbuild/bootc-image-builder-action@main
         with:
           # First build your base container image (your current Containerfile)
           containerfile: ./Containerfile
