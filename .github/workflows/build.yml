@@ -5,17 +5,18 @@ on:
     branches:
       - main
   schedule:
-    - cron: '20 20 * * *'  # 8:20pm everyday
+    - cron: '20 20 * * *'
   push:
     branches:
       - main
+
 env:
-    IMAGE_NAME: base39
-    IMAGE_REGISTRY: ghcr.io/${{ github.repository_owner }}
+  IMAGE_NAME: base39
+  IMAGE_REGISTRY: ghcr.io/${{ github.repository_owner }}
 
 jobs:
   push-ghcr:
-    name: Build and push image
+    name: Build and push bootc disk image
     runs-on: ubuntu-22.04
     permissions:
       contents: read
@@ -29,9 +30,9 @@ jobs:
           - major_version: 43
             is_latest: true
             is_stable: true
-    steps: 
-      # Checkout push-to-registry action GitHub repository
-      - name: Checkout Push to Registry action
+
+    steps:
+      - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Generate tags
@@ -40,68 +41,58 @@ jobs:
         run: |
           echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
           alias_tags=()
-          # Only perform the follow code when the action is spawned from a Pull Request
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then
             alias_tags+=("pr-${{ github.event.number }}")
           else
-            # The following is run when the timer is triggered or a merge/push to main
             echo "date=$(date +%Y%m%d)" >> $GITHUB_OUTPUT
             alias_tags+=("${{ matrix.major_version }}")
-            if [[ "${{ matrix.is_latest }}" == "true" ]]; then
-              alias_tags+=("latest")
-            fi
-            if [[ "${{ matrix.is_stable }}" == "true" ]]; then
-              alias_tags+=("stable")
-            fi
+            [[ "${{ matrix.is_latest }}" == "true" ]] && alias_tags+=("latest")
+            [[ "${{ matrix.is_stable }}" == "true" ]] && alias_tags+=("stable")
           fi
           echo "alias_tags=${alias_tags[*]}" >> $GITHUB_OUTPUT
 
-      # Build image using Buildah action
-      - name: Build Image
+      # NEW: Use bootc-image-build instead of buildah-build
+      - name: Build bootc disk image with 200M composefs root
         id: build_image
-        uses: redhat-actions/buildah-build@v2
+        uses: redhat-actions/bootc-image-build@v1
         with:
-          containerfiles: |
-            ./Containerfile
-          image: ${{ env.IMAGE_NAME }}
+          containerfile: ./Containerfile
+          image: ${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
             ${{ steps.generate-tags.outputs.alias_tags }}
             ${{ steps.generate-tags.outputs.date }}
             ${{ steps.generate-tags.outputs.sha_short }}
           build-args: |
             FEDORA_MAJOR_VERSION=${{ matrix.major_version }}
-          oci: true
+          type: anaconda-iso   # or 'qcow2', 'raw' – anaconda-iso works great for Silverblue-like installs
+          rootfs-size: 200M     # <--- THIS SETS COMPOSEFS ROOT TO 200 MiB
+          arch: x86_64
 
-      # Workaround bug where capital letters in your GitHub username make it impossible to push to GHCR.
-      # https://github.com/macbre/push-to-ghcr/issues/12
+      # Lowercase registry workaround (still needed)
       - name: Lowercase Registry
         id: registry_case
         uses: ASzc/change-string-case-action@v6
         with:
           string: ${{ env.IMAGE_REGISTRY }}
 
-      # Push the image to GHCR (Image Registry)
+      # Push (unchanged)
       - name: Push To GHCR
         uses: redhat-actions/push-to-registry@v2
         id: push
-        env:
-          REGISTRY_USER: ${{ github.actor }}
-          REGISTRY_PASSWORD: ${{ github.token }}
         with:
           image: ${{ steps.build_image.outputs.image }}
           tags: ${{ steps.build_image.outputs.tags }}
           registry: ${{ steps.registry_case.outputs.lowercase }}
-          username: ${{ env.REGISTRY_USER }}
-          password: ${{ env.REGISTRY_PASSWORD }}
-          extra-args: |
-            --disable-content-trust
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+          extra-args: --disable-content-trust
 
+      # Signing steps (unchanged, but update reference if needed)
       - name: cosign-installer
         uses: sigstore/cosign-installer@v3.1.1
 
       - name: Write signing key to disk
         run: 'echo "$KEY" > cosign.key'
-        shell: bash
         env:
           KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
 
@@ -118,10 +109,7 @@ jobs:
           cosign sign --yes --key cosign.key ${{ steps.registry_case.outputs.lowercase }}/${{ env.IMAGE_NAME }}@${TAGS}
         env:
           TAGS: ${{ steps.push.outputs.digest }}
-          COSIGN_EXPERIMENTAL: false
           COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
 
-
       - name: Echo outputs
-        run: |
-          echo "${{ toJSON(steps.push.outputs) }}"
+        run: echo "${{ toJSON(steps.push.outputs) }}"
