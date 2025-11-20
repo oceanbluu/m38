@@ -1,19 +1,17 @@
 name: build-myFedora
-
 on:
   workflow_dispatch:
   pull_request:
     branches:
       - main
   schedule:
-    - cron: '20 20 * * *'
+    - cron: '20 20 * * *'  # 8:20pm everyday
   push:
     branches:
       - main
-
 env:
-  IMAGE_NAME: customAtomic
-  IMAGE_REGISTRY: ghcr.io/${{ github.repository_owner }}
+    IMAGE_NAME: customAtomic
+    IMAGE_REGISTRY: ghcr.io/${{ github.repository_owner }}
 
 jobs:
   push-ghcr:
@@ -23,7 +21,6 @@ jobs:
       contents: read
       packages: write
       id-token: write
-
     strategy:
       fail-fast: false
       matrix:
@@ -32,9 +29,9 @@ jobs:
           - major_version: 43
             is_latest: true
             is_stable: true
-
-    steps:
-      - name: Checkout repository
+    steps: 
+      # Checkout push-to-registry action GitHub repository
+      - name: Checkout Push to Registry action
         uses: actions/checkout@v4
 
       - name: Generate tags
@@ -43,19 +40,25 @@ jobs:
         run: |
           echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
           alias_tags=()
+          # Only perform the follow code when the action is spawned from a Pull Request
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then
             alias_tags+=("pr-${{ github.event.number }}")
           else
+            # The following is run when the timer is triggered or a merge/push to main
             echo "date=$(date +%Y%m%d)" >> $GITHUB_OUTPUT
             alias_tags+=("${{ matrix.major_version }}")
-            [[ "${{ matrix.is_latest }}" == "true" ]] && alias_tags+=("latest")
-            [[ "${{ matrix.is_stable }}" == "true" ]] && alias_tags+=("stable")
+            if [[ "${{ matrix.is_latest }}" == "true" ]]; then
+              alias_tags+=("latest")
+            fi
+            if [[ "${{ matrix.is_stable }}" == "true" ]]; then
+              alias_tags+=("stable")
+            fi
           fi
           echo "alias_tags=${alias_tags[*]}" >> $GITHUB_OUTPUT
 
-      # 1. Build fast OCI image
-      - name: Build OCI base image
-        id: build_oci
+      # Build image using Buildah action
+      - name: Build Image
+        id: build_image
         uses: redhat-actions/buildah-build@v2
         with:
           containerfiles: |
@@ -69,95 +72,56 @@ jobs:
             FEDORA_MAJOR_VERSION=${{ matrix.major_version }}
           oci: true
 
-      # 2. Push OCI image
-      - name: Lowercase Registry (GHCR workaround)
+      # Workaround bug where capital letters in your GitHub username make it impossible to push to GHCR.
+      # https://github.com/macbre/push-to-ghcr/issues/12
+      - name: Lowercase Registry
         id: registry_case
         uses: ASzc/change-string-case-action@v6
         with:
           string: ${{ env.IMAGE_REGISTRY }}
 
-      - name: Push OCI image to GHCR
+      # Push the image to GHCR (Image Registry)
+      - name: Push To GHCR
         uses: redhat-actions/push-to-registry@v2
-        id: push_oci
+        id: push
+        env:
+          REGISTRY_USER: ${{ github.actor }}
+          REGISTRY_PASSWORD: ${{ github.token }}
         with:
-          image: ${{ steps.build_oci.outputs.image }}
-          tags: ${{ steps.build_oci.outputs.tags }}
+          image: ${{ steps.build_image.outputs.image }}
+          tags: ${{ steps.build_image.outputs.tags }}
           registry: ${{ steps.registry_case.outputs.lowercase }}
-          username: ${{ github.actor }}
-          password: ${{ github.token }}
-          extra-args: --disable-content-trust
+          username: ${{ env.REGISTRY_USER }}
+          password: ${{ env.REGISTRY_PASSWORD }}
+          extra-args: |
+            --disable-content-trust
 
-      # 3. Switch Podman to rootful mode (required for qcow2)
-      - name: Enable rootful Podman
-        run: |
-          sudo podman system migrate
-          sudo systemctl enable --now podman.socket   # <-- this starts the rootful service
-
-      # 4. Create config.toml → minimum 200 MiB composefs root
-      - name: Create bootc-image-builder config
-        run: |
-          cat > config.toml <<'EOF'
-          [[customizations.disk.partitions]]
-          mountpoint = "/"
-          size = "200 MiB"
-          EOF
-
-      # 5. Build disk image with large composefs root
-      - name: Build bootc disk image (≥200 MiB composefs root)
-        run: |
-          set -exo pipefail
-          mkdir -p output
-
-          # Choose a single reliable tag
-          if [[ "${{ steps.generate-tags.outputs.alias_tags }}" == *"latest"* ]]; then
-            SINGLE_TAG="latest"
-          else
-            SINGLE_TAG="${{ matrix.major_version }}"
-          fi
-
-          FULL_IMAGE="${{ steps.registry_case.outputs.lowercase }}/${{ env.IMAGE_NAME }}:$SINGLE_TAG"
-
-          podman run --rm --privileged --security-opt label=type:unconfined \
-            -v $(pwd)/output:/output \
-            -v $(pwd)/config.toml:/config.toml:ro \
-            quay.io/centos-bootc/bootc-image-builder:latest \
-              --type qcow2 \
-              --config /config.toml \
-              --tls-verify=false \
-              --output /output \
-              "$FULL_IMAGE"
-
-          # Push qcow2 with all tags
-          for tag in ${{ steps.generate-tags.outputs.alias_tags }} ${{ steps.generate-tags.outputs.date }} ${{ steps.generate-tags.outputs.sha_short }}; do
-            podman push "$FULL_IMAGE.qcow2" \
-              ${{ steps.registry_case.outputs.lowercase }}/${{ env.IMAGE_NAME }}:${tag}.qcow2
-          done
-
-      # 6. Cosign signing (optional)
-      - name: Install cosign
-        if: github.event_name != 'pull_request'
+      - name: cosign-installer
         uses: sigstore/cosign-installer@v3.1.1
 
-      - name: Write signing key
-        if: github.event_name != 'pull_request'
-        run: echo "$KEY" > cosign.key
+      - name: Write signing key to disk
+        run: 'echo "$KEY" > cosign.key'
+        shell: bash
         env:
           KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
 
-      - name: Login to GHCR for cosign
-        if: github.event_name != 'pull_request'
+      - name: Login to GitHub Container Registry
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Sign OCI image
+      - name: Sign container image
         if: github.event_name != 'pull_request'
         run: |
-          cosign sign --yes --key cosign.key ${{ steps.registry_case.outputs.lowercase }}/${{ env.IMAGE_NAME }}@${{ steps.push_oci.outputs.digest }}
+          cosign sign --yes --key cosign.key ${{ steps.registry_case.outputs.lowercase }}/${{ env.IMAGE_NAME }}@${TAGS}
         env:
+          TAGS: ${{ steps.push.outputs.digest }}
+          COSIGN_EXPERIMENTAL: false
           COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
 
-      - name: Done
-        run: echo "Your custom Fedora Atomic image now has a large composefs root – no more update failures ever!"
+
+      - name: Echo outputs
+        run: |
+          echo "${{ toJSON(steps.push.outputs) }}"
