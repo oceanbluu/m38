@@ -3,7 +3,7 @@ name: build-myFedora
 on:
   workflow_dispatch:
   pull_request:
-    branches:
+   branches:
       - main
   schedule:
     - cron: '20 20 * * *'
@@ -12,7 +12,7 @@ on:
       - main
 
 env:
-  IMAGE_NAME: customAtomic
+  IMAGE_NAME: base39
   IMAGE_REGISTRY: ghcr.io/${{ github.repository_owner }}
 
 jobs:
@@ -87,7 +87,11 @@ jobs:
           password: ${{ github.token }}
           extra-args: --disable-content-trust
 
-      # 3. Create config.toml → minimum 200 MiB composefs root
+      # 3. Switch to rootful Podman (required for qcow2)
+      - name: Enable rootful Podman
+        run: sudo podman system migrate
+
+      # 4. Create config.toml → minimum 200 MiB composefs root
       - name: Create bootc-image-builder config
         run: |
           cat > config.toml <<'EOF'
@@ -96,13 +100,13 @@ jobs:
           size = "200 MiB"
           EOF
 
-      # 4. Build disk image with large composefs root
+      # 5. Build disk image with large composefs root
       - name: Build bootc disk image (≥200 MiB composefs root)
         run: |
           set -exo pipefail
           mkdir -p output
 
-          # Choose a single tag that is guaranteed to exist and be unique
+          # Choose a single reliable tag
           if [[ "${{ steps.generate-tags.outputs.alias_tags }}" == *"latest"* ]]; then
             SINGLE_TAG="latest"
           else
@@ -121,13 +125,13 @@ jobs:
               --output /output \
               "$FULL_IMAGE"
 
-          # Push the generated qcow2 with ALL desired tags
+          # Push qcow2 with all tags
           for tag in ${{ steps.generate-tags.outputs.alias_tags }} ${{ steps.generate-tags.outputs.date }} ${{ steps.generate-tags.outputs.sha_short }}; do
             podman push "$FULL_IMAGE.qcow2" \
               ${{ steps.registry_case.outputs.lowercase }}/${{ env.IMAGE_NAME }}:${tag}.qcow2
           done
 
-      # 5. Cosign signing (optional)
+      # 6. Cosign signing (optional)
       - name: Install cosign
         if: github.event_name != 'pull_request'
         uses: sigstore/cosign-installer@v3.1.1
@@ -153,6 +157,5 @@ jobs:
         env:
           COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
 
-      - name: Echo outputs
-        run: |
-          echo "Success! OCI + .qcow2 disk images with ≥200 MiB composefs root are ready"
+      - name: Done
+        run: echo "Success! Your custom Atomic image now has a large composefs root – no more update failures"
