@@ -52,21 +52,19 @@ jobs:
           echo "alias_tags=${alias_tags[*]}" >> $GITHUB_OUTPUT
 
       # NEW: Use bootc-image-build instead of buildah-build
-      - name: Build bootc disk image with 200M composefs root
-        id: build_image
-        uses: redhat-actions/bootc-image-build@v1
+      - name: Build bootc image with 200M composefs root
+        uses: centos-bootc/bootc-image-builder@v1
         with:
           containerfile: ./Containerfile
-          image: ${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAME }}
+          image-name: ${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
             ${{ steps.generate-tags.outputs.alias_tags }}
             ${{ steps.generate-tags.outputs.date }}
             ${{ steps.generate-tags.outputs.sha_short }}
-          build-args: |
-            FEDORA_MAJOR_VERSION=${{ matrix.major_version }}
-          type: anaconda-iso   # or 'qcow2', 'raw' – anaconda-iso works great for Silverblue-like installs
-          rootfs-size: 200M     # <--- THIS SETS COMPOSEFS ROOT TO 200 MiB
-          arch: x86_64
+          rootfs-size: 200M
+          type: qcow2
+          extra-args: |
+            --build-arg FEDORA_MAJOR_VERSION=${{ matrix.major_version }}
 
       # Lowercase registry workaround (still needed)
       - name: Lowercase Registry
