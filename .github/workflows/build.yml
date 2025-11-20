@@ -10,7 +10,7 @@ on:
     branches:
       - main
 env:
-    IMAGE_NAME: customAtomic
+    IMAGE_NAME: customatomic
     IMAGE_REGISTRY: ghcr.io/${{ github.repository_owner }}
 
 jobs:
@@ -118,8 +118,8 @@ jobs:
           IMAGE="${{ steps.registry_case.outputs.lowercase }}/${{ env.IMAGE_NAME }}"
 
           # Sign the two tags that always exist and matter
-          # cosign sign --yes --key cosign.key "${IMAGE}:latest"
-          # cosign sign --yes --key cosign.key "${IMAGE}:${{ matrix.major_version }}"
+          cosign sign --yes --key cosign.key "${IMAGE}:latest"
+          cosign sign --yes --key cosign.key "${IMAGE}:${{ matrix.major_version }}"
 
           # Optional: also sign the dated and sha tags if you want
           cosign sign --yes --key cosign.key "${IMAGE}:${{ steps.generate-tags.outputs.date }}" || true
