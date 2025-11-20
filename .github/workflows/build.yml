@@ -11,7 +11,7 @@ on:
       - main
 
 env:
-  IMAGE_NAME: base39
+  IMAGE_NAME: customSilverblue
   IMAGE_REGISTRY: ghcr.io/${{ github.repository_owner }}
 
 jobs:
@@ -52,20 +52,28 @@ jobs:
           echo "alias_tags=${alias_tags[*]}" >> $GITHUB_OUTPUT
 
       # NEW: Use bootc-image-build instead of buildah-build
-      - name: Build bootc image with 200M composefs root
-        uses: centos-bootc/bootc-image-builder@v1
+      - name: Build bootc disk image with 200M composefs root
+        uses: osbuild/bootc-image-builder-action@v0.1.0
         with:
+          # First build your base container image (your current Containerfile)
           containerfile: ./Containerfile
-          image-name: ${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAME }}
+          build-args: |
+            FEDORA_MAJOR_VERSION=${{ matrix.major_version }}
+
+          # Then convert it to a bootable disk image with large root
+          image: ${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAME }}  # your final tagged image
           tags: |
             ${{ steps.generate-tags.outputs.alias_tags }}
             ${{ steps.generate-tags.outputs.date }}
             ${{ steps.generate-tags.outputs.sha_short }}
-          rootfs-size: 200M
-          type: qcow2
-          extra-args: |
-            --build-arg FEDORA_MAJOR_VERSION=${{ matrix.major_version }}
 
+          # Critical: these control the disk image output
+          types: qcow2          # or raw, anaconda-iso, etc.
+          rootfs-size: 200M     # ← This finally fixes your "No space left on device" forever
+          # Optional but recommended
+          rootfs: ext4          # or xfs
+          tls-verify: false     # if using GHCR
+    
       # Lowercase registry workaround (still needed)
       - name: Lowercase Registry
         id: registry_case
