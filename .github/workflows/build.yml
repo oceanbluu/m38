@@ -12,7 +12,7 @@ on:
       - main
 
 env:
-  IMAGE_NAME: customFAtomic
+  IMAGE_NAME: customAtomic
   IMAGE_REGISTRY: ghcr.io/${{ github.repository_owner }}
 
 jobs:
@@ -102,7 +102,14 @@ jobs:
           set -exo pipefail
           mkdir -p output
 
-          PRIMARY_TAG="${{ steps.generate-tags.outputs.alias_tags }}"
+          # Choose a single tag that is guaranteed to exist and be unique
+          if [[ "${{ steps.generate-tags.outputs.alias_tags }}" == *"latest"* ]]; then
+            SINGLE_TAG="latest"
+          else
+            SINGLE_TAG="${{ matrix.major_version }}"
+          fi
+
+          FULL_IMAGE="${{ steps.registry_case.outputs.lowercase }}/${{ env.IMAGE_NAME }}:$SINGLE_TAG"
 
           podman run --rm --privileged --security-opt label=type:unconfined \
             -v $(pwd)/output:/output \
@@ -112,10 +119,11 @@ jobs:
               --config /config.toml \
               --tls-verify=false \
               --output /output \
-              ${{ steps.registry_case.outputs.lowercase }}/${{ env.IMAGE_NAME }}:$PRIMARY_TAG
+              "$FULL_IMAGE"
 
+          # Push the generated qcow2 with ALL desired tags
           for tag in ${{ steps.generate-tags.outputs.alias_tags }} ${{ steps.generate-tags.outputs.date }} ${{ steps.generate-tags.outputs.sha_short }}; do
-            podman push ${{ steps.registry_case.outputs.lowercase }}/${{ env.IMAGE_NAME }}:${PRIMARY_TAG}.qcow2 \
+            podman push "$FULL_IMAGE.qcow2" \
               ${{ steps.registry_case.outputs.lowercase }}/${{ env.IMAGE_NAME }}:${tag}.qcow2
           done
 
@@ -147,4 +155,4 @@ jobs:
 
       - name: Echo outputs
         run: |
-          echo "All done – OCI + .qcow2 disk images with ≥200 MiB root are ready"
+          echo "Success! OCI + .qcow2 disk images with ≥200 MiB composefs root are ready"
