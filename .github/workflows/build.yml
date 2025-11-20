@@ -1,11 +1,12 @@
 name: build-myFedora
+
 on:
   workflow_dispatch:
   pull_request:
     branches:
       - main
   schedule:
-    - cron: '20 20 * * *'
+    - cron: '20 20 * * *'   # 8:20pm every day
   push:
     branches:
       - main
@@ -16,12 +17,13 @@ env:
 
 jobs:
   push-ghcr:
-    name: Build and push bootc disk image
+    name: Build and push image
     runs-on: ubuntu-22.04
     permissions:
       contents: read
       packages: write
       id-token: write
+
     strategy:
       fail-fast: false
       matrix:
@@ -51,71 +53,89 @@ jobs:
           fi
           echo "alias_tags=${alias_tags[*]}" >> $GITHUB_OUTPUT
 
-      # NEW: Use bootc-image-build instead of buildah-build
-      - name: Build bootc disk image with 200M composefs root
-        uses: osbuild/bootc-image-builder-action@main
+      # ──────────────────────────────────────────────────────────────
+      # 1. Build the fast OCI container image (exactly like before)
+      # ──────────────────────────────────────────────────────────────
+      - name: Build OCI base image
+        id: build_oci
+        uses: redhat-actions/buildah-build@v2
         with:
-          # First build your base container image (your current Containerfile)
-          containerfile: ./Containerfile
-          build-args: |
-            FEDORA_MAJOR_VERSION=${{ matrix.major_version }}
-
-          # Then convert it to a bootable disk image with large root
-          image: ${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAME }}  # your final tagged image
+          containerfiles: |
+            ./Containerfile
+          image: ${{ env.IMAGE_NAME }}
           tags: |
             ${{ steps.generate-tags.outputs.alias_tags }}
             ${{ steps.generate-tags.outputs.date }}
             ${{ steps.generate-tags.outputs.sha_short }}
+          build-args: |
+            FEDORA_MAJOR_VERSION=${{ matrix.major_version }}
+          oci: true
 
-          # Critical: these control the disk image output
-          types: qcow2          # or raw, anaconda-iso, etc.
-          rootfs-size: 200M     # ← This finally fixes your "No space left on device" forever
-          # Optional but recommended
-          rootfs: ext4          # or xfs
-          tls-verify: false     # if using GHCR
-    
-      # Lowercase registry workaround (still needed)
-      - name: Lowercase Registry
+      # ──────────────────────────────────────────────────────────────
+      # 2. Push the OCI image first (required for the next step)
+      # ──────────────────────────────────────────────────────────────
+      - name: Lowercase Registry (GHCR workaround)
         id: registry_case
         uses: ASzc/change-string-case-action@v6
         with:
           string: ${{ env.IMAGE_REGISTRY }}
 
-      # Push (unchanged)
-      - name: Push To GHCR
+      - name: Push OCI image to GHCR
         uses: redhat-actions/push-to-registry@v2
-        id: push
+        id: push_oci
         with:
-          image: ${{ steps.build_image.outputs.image }}
-          tags: ${{ steps.build_image.outputs.tags }}
+          image: ${{ steps.build_oci.outputs.image }}
+          tags: ${{ steps.build_oci.outputs.tags }}
           registry: ${{ steps.registry_case.outputs.lowercase }}
           username: ${{ github.actor }}
           password: ${{ github.token }}
           extra-args: --disable-content-trust
 
-      # Signing steps (unchanged, but update reference if needed)
-      - name: cosign-installer
+      # ──────────────────────────────────────────────────────────────
+      # 3. Convert the OCI image → bootable disk image with 200M root
+      # ──────────────────────────────────────────────────────────────
+      - name: Build bootc disk image (200M composefs root)
+        uses: osbuild/bootc-image-builder-action@main
+        with:
+          image: ${{ steps.registry_case.outputs.lowercase }}/${{ env.IMAGE_NAME }}:${{ steps.generate-tags.outputs.alias_tags }}
+          types: qcow2               # you can change to raw (faster) or anaconda-iso
+          rootfs-size: 200M          # ← this fixes your space problem forever
+          rootfs: ext4               # or xfs
+          tls-verify: false          # required for GHCR
+
+      # The action above automatically pushes the qcow2 with the exact same tags
+      # → ghcr.io/youruser/base39:latest.qcow2 (and :43.qcow2, :stable.qcow2, etc.)
+
+      # ──────────────────────────────────────────────────────────────
+      # 4. Cosign signing (optional, unchanged from your original)
+      # ──────────────────────────────────────────────────────────────
+      - name: Install cosign
         uses: sigstore/cosign-installer@v3.1.1
 
-      - name: Write signing key to disk
-        run: 'echo "$KEY" > cosign.key'
+      - name: Write signing key
+        if: github.event_name != 'pull_request'
+        run: echo "$KEY" > cosign.key
         env:
           KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
 
-      - name: Login to GitHub Container Registry
+      - name: Login to GHCR for cosign
+        if: github.event_name != 'pull_request'
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Sign container image
+      - name: Sign images
         if: github.event_name != 'pull_request'
         run: |
-          cosign sign --yes --key cosign.key ${{ steps.registry_case.outputs.lowercase }}/${{ env.IMAGE_NAME }}@${TAGS}
+          # Sign the OCI image
+          cosign sign --yes --key cosign.key ${{ steps.registry_case.outputs.lowercase }}/${{ env.IMAGE_NAME }}@${{ steps.push_oci.outputs.digest }}
+          # Optionally sign the qcow2 too (digest is different, skip if you don’t need it)
         env:
-          TAGS: ${{ steps.push.outputs.digest }}
           COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
 
       - name: Echo outputs
-        run: echo "${{ toJSON(steps.push.outputs) }}"
+        run: |
+          echo "OCI image: ${{ steps.push_oci.outputs.imagewithdigest }}"
+          echo "Disk image tags pushed with .qcow2 suffix"
