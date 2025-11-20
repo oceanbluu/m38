@@ -12,7 +12,7 @@ on:
       - main
 
 env:
-  IMAGE_NAME: customSilverblue
+  IMAGE_NAME: base39
   IMAGE_REGISTRY: ghcr.io/${{ github.repository_owner }}
 
 jobs:
@@ -53,9 +53,9 @@ jobs:
           fi
           echo "alias_tags=${alias_tags[*]}" >> $GITHUB_OUTPUT
 
-      # ──────────────────────────────────────────────────────────────
-      # 1. Build the fast OCI container image (exactly like before)
-      # ──────────────────────────────────────────────────────────────
+      # ──────────────────────────────
+      # 1. Build fast OCI image
+      # ──────────────────────────────
       - name: Build OCI base image
         id: build_oci
         uses: redhat-actions/buildah-build@v2
@@ -71,9 +71,9 @@ jobs:
             FEDORA_MAJOR_VERSION=${{ matrix.major_version }}
           oci: true
 
-      # ──────────────────────────────────────────────────────────────
-      # 2. Push the OCI image first (required for the next step)
-      # ──────────────────────────────────────────────────────────────
+      # ──────────────────────────────
+      # 2. Push OCI image (required before conversion)
+      # ──────────────────────────────
       - name: Lowercase Registry (GHCR workaround)
         id: registry_case
         uses: ASzc/change-string-case-action@v6
@@ -91,25 +91,36 @@ jobs:
           password: ${{ github.token }}
           extra-args: --disable-content-trust
 
-      # ──────────────────────────────────────────────────────────────
-      # 3. Convert the OCI image → bootable disk image with 200M root
-      # ──────────────────────────────────────────────────────────────
+      # ──────────────────────────────
+      # 3. Convert to bootable disk image with 200M composefs root
+      # ──────────────────────────────
       - name: Build bootc disk image (200M composefs root)
-        uses: osbuild/bootc-image-builder-action@main
-        with:
-          image: ${{ steps.registry_case.outputs.lowercase }}/${{ env.IMAGE_NAME }}:${{ steps.generate-tags.outputs.alias_tags }}
-          types: qcow2               # you can change to raw (faster) or anaconda-iso
-          rootfs-size: 200M          # ← this fixes your space problem forever
-          rootfs: ext4               # or xfs
-          tls-verify: false          # required for GHCR
+        run: |
+          set -exo pipefail
+          mkdir -p output
 
-      # The action above automatically pushes the qcow2 with the exact same tags
-      # → ghcr.io/youruser/base39:latest.qcow2 (and :43.qcow2, :stable.qcow2, etc.)
+          podman run --rm --privileged --security-opt label=type:unconfined \
+            -v $(pwd)/output:/output \
+            quay.io/centos-bootc/bootc-image-builder:latest build \
+              --type qcow2 \
+              --rootfs-size 200M \
+              --rootfs ext4 \
+              --tls-verify=false \
+              --output /output \
+              ${{ steps.registry_case.outputs.lowercase }}/${{ env.IMAGE_NAME }}:${{ steps.generate-tags.outputs.alias_tags }} \
+              ${{ steps.registry_case.outputs.lowercase }}/${{ env.IMAGE_NAME }}:${{ steps.generate-tags.outputs.date }} \
+              ${{ steps.registry_case.outputs.lowercase }}/${{ env.IMAGE_NAME }}:${{ steps.generate-tags.outputs.sha_short }}
 
-      # ──────────────────────────────────────────────────────────────
-      # 4. Cosign signing (optional, unchanged from your original)
-      # ──────────────────────────────────────────────────────────────
+          # Push all generated qcow2 images
+          for tag in ${{ steps.generate-tags.outputs.alias_tags }} ${{ steps.generate-tags.outputs.date }} ${{ steps.generate-tags.outputs.sha_short }}; do
+            podman push ${{ steps.registry_case.outputs.lowercase }}/${{ env.IMAGE_NAME }}:${tag}.qcow2
+          done
+
+      # ──────────────────────────────
+      # 4. Cosign signing (optional – signs OCI only; qcow2 optional)
+      # ──────────────────────────────
       - name: Install cosign
+        if: github.event_name != 'pull_request'
         uses: sigstore/cosign-installer@v3.1.1
 
       - name: Write signing key
@@ -126,16 +137,14 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Sign images
+      - name: Sign OCI image
         if: github.event_name != 'pull_request'
         run: |
-          # Sign the OCI image
           cosign sign --yes --key cosign.key ${{ steps.registry_case.outputs.lowercase }}/${{ env.IMAGE_NAME }}@${{ steps.push_oci.outputs.digest }}
-          # Optionally sign the qcow2 too (digest is different, skip if you don’t need it)
         env:
           COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
 
       - name: Echo outputs
         run: |
-          echo "OCI image: ${{ steps.push_oci.outputs.imagewithdigest }}"
-          echo "Disk image tags pushed with .qcow2 suffix"
+          echo "OCI image pushed: ${{ steps.push_oci.outputs.imagewithdigest }}"
+          echo "Disk images available as .qcow2 with the same tags"
