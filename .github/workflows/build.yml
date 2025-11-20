@@ -3,7 +3,7 @@ name: build-myFedora
 on:
   workflow_dispatch:
   pull_request:
-   branches:
+    branches:
       - main
   schedule:
     - cron: '20 20 * * *'
@@ -12,7 +12,7 @@ on:
       - main
 
 env:
-  IMAGE_NAME: base39
+  IMAGE_NAME: customAtomic
   IMAGE_REGISTRY: ghcr.io/${{ github.repository_owner }}
 
 jobs:
@@ -87,9 +87,11 @@ jobs:
           password: ${{ github.token }}
           extra-args: --disable-content-trust
 
-      # 3. Switch to rootful Podman (required for qcow2)
+      # 3. Switch Podman to rootful mode (required for qcow2)
       - name: Enable rootful Podman
-        run: sudo podman system migrate
+        run: |
+          sudo podman system migrate
+          sudo systemctl enable --now podman.socket   # <-- this starts the rootful service
 
       # 4. Create config.toml → minimum 200 MiB composefs root
       - name: Create bootc-image-builder config
@@ -158,4 +160,4 @@ jobs:
           COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
 
       - name: Done
-        run: echo "Success! Your custom Atomic image now has a large composefs root – no more update failures"
+        run: echo "Your custom Fedora Atomic image now has a large composefs root – no more update failures ever!"
