@@ -115,21 +115,15 @@ jobs:
       - name: Sign OCI image
         if: github.event_name != 'pull_request'
         run: |
-          # Get the actual digest from the push step (force it to be correct)
-          DIGEST=$(skopeo inspect --raw docker://$(cat /tmp/image-with-digest) | jq -r '.digest' || true)
-          if [ -z "$DIGEST" ]; then
-            echo "Digest not found via skopeo, falling back to push output"
-            DIGEST="${{ steps.push_oci.outputs.digest }}"
-          fi
+          IMAGE="${{ steps.registry_case.outputs.lowercase }}/${{ env.IMAGE_NAME }}"
 
-          # Final fallback – just use the latest tag (GHCR is fast enough)
-          if [[ "$DIGEST" == *@* || -z "$DIGEST" ]]; then
-            echo "Using tag-based signing as last resort"
-            cosign sign --yes --key cosign.key ${{ steps.registry_case.outputs.lowercase }}/${{ env.IMAGE_NAME }}:latest
-          else
-            echo "Signing with digest: $DIGEST"
-            cosign sign --yes --key cosign.key ${{ steps.registry_case.outputs.lowercase }}/${{ env.IMAGE_NAME }}@$DIGEST
-          fi
+          # Sign the two tags that always exist and matter
+          cosign sign --yes --key cosign.key "${IMAGE}:latest"
+          cosign sign --yes --key cosign.key "${IMAGE}:${{ matrix.major_version }}"
+
+          # Optional: also sign the dated and sha tags if you want
+          cosign sign --yes --key cosign.key "${IMAGE}:${{ steps.generate-tags.outputs.date }}" || true
+          cosign sign --yes --key cosign.key "${IMAGE}:${{ steps.generate-tags.outputs.sha_short }}" || true
         env:
           COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
 
