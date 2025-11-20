@@ -115,15 +115,8 @@ jobs:
       - name: Sign OCI image
         if: github.event_name != 'pull_request'
         run: |
-          # Wait for all tags to be fully registered in GHCR (important after rename)
-          sleep 10
-
-          # Sign by digest – this always works, no matter what the name or tags are
-          IMAGE_REF="${{ steps.registry_case.outputs.lowercase }}/${{ env.IMAGE_NAME }}"
-          DIGEST="${{ steps.push_oci.outputs.digest }}"
-
-          echo "Signing $IMAGE_REF@$DIGEST"
-          cosign sign --yes --key cosign.key "$IMAGE_REF@$DIGEST"
+          cosign sign --yes --key cosign.key ${{ steps.registry_case.outputs.lowercase }}/${{ env.IMAGE_NAME }}:latest
+          cosign sign --yes --key cosign.key ${{ steps.registry_case.outputs.lowercase }}/${{ env.IMAGE_NAME }}:${{ matrix.major_version }}
         env:
           COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
 
